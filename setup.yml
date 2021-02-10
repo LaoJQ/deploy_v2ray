@@ -1,0 +1,95 @@
+## Deploy v2ray in a new VPS (ubuntu)
+      
+# Install unzip
+- name: install unzip
+  hosts: all
+  tasks:
+    - apt:
+        name: "unzip"
+        state: present
+
+# Download and decompress v2ray packet
+- name: download v2ray
+  hosts: all
+  tasks:
+    - get_url:
+        url: "https://github.com/v2ray/v2ray-core/releases/download/v4.16.0/v2ray-linux-64.zip"
+        dest: "/root/"
+        owner: root
+        group: root
+        force: no
+    - file:
+        path: "/root/v2ray/"
+        state: directory
+        owner: root
+        group: root
+    - unarchive:
+        src: "/root/v2ray-linux-64.zip"
+        dest: "/root/v2ray/"
+        owner: root
+        group: root
+        copy: no
+
+# Create some dirs
+- name: create some dirs
+  hosts: all
+  tasks:
+    - file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: 0755
+      with_items:
+        - "/etc/v2ray/"
+        - "/usr/bin/v2ray/"
+        - "/var/log/v2ray/"
+
+
+# Copy v2ray exec file to special path
+- name: copy some files
+  hosts: all
+  tasks:
+    - copy:
+        src: "{{ item }}"
+        remote_src: true
+        dest: "/usr/bin/v2ray/"
+        owner: root
+        group: root
+        mode: 0755
+      with_items:
+        - "/root/v2ray/v2ray"
+        - "/root/v2ray/v2ctl"
+        - "/root/v2ray/geoip.dat"
+        - "/root/v2ray/geosite.dat"
+
+
+# Copy config.json file to VPS
+- name: copy config.json
+  hosts: all
+  tasks:
+    - template:
+        src: "server_config.json.j2"
+        dest: "/etc/v2ray/config.json"
+        owner: root
+        group: root
+
+
+# Use systemd to start v2ray
+- name: start v2ray
+  hosts: all
+  tasks:
+    - copy:
+        src: "/root/v2ray/systemd/v2ray.service"
+        remote_src: true
+        dest: "/etc/systemd/system/"
+        owner: root
+        group: root
+    - systemd:
+        name: v2ray.service
+        enabled: true
+        state: started
+        daemon_reload: yes
+    - systemd:
+        name: systemd-journald
+        state: restarted
